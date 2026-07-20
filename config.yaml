@@ -1,0 +1,40 @@
+name: Alerte immo quotidienne
+
+on:
+  schedule:
+    # Tous les jours à 07:00 UTC (~08:00/09:00 heure suisse selon saison)
+    - cron: "0 7 * * *"
+  workflow_dispatch: {}   # permet de lancer manuellement depuis l'onglet Actions
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout du repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      - name: Lancer le script
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+        run: python main.py
+
+      - name: Sauvegarder seen.json (évite les doublons demain)
+        run: |
+          git config user.name "immo-alerts-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add seen.json
+          git diff --quiet --cached || git commit -m "Update seen.json [skip ci]"
+          git push
